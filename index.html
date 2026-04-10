@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI FinOps · Anthropic Claude Cost Framework</title>
+<meta name="description" content="Diagnose, understand, and optimize Anthropic Claude costs across seat subscriptions, API usage, and Claude Code.">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,700;1,9..144,400@display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0e0f11;--surface:#161719;--surface-2:#1d1f22;--surface-3:#25282c;--border:#2a2d32;--border-light:#353940;--text:#e8e6e3;--text-dim:#9a9590;--text-muted:#6b6560;--accent-amber:#d4a54a;--accent-amber-dim:rgba(212,165,74,.12);--accent-blue:#5b8fd9;--accent-blue-dim:rgba(91,143,217,.12);--accent-green:#5dab80;--accent-green-dim:rgba(93,171,128,.12);--accent-red:#d45a5a;--accent-red-dim:rgba(212,90,90,.12);--accent-purple:#9b7bd4;--accent-purple-dim:rgba(155,123,212,.12);--fixed:#e07a4a;--fixed-dim:rgba(224,122,74,.12);--variable:#5b8fd9;--variable-dim:rgba(91,143,217,.12);--hybrid:#9b7bd4;--hybrid-dim:rgba(155,123,212,.12);--radius:10px;--radius-lg:16px;--shadow:0 2px 12px rgba(0,0,0,.3)}
+*{margin:0;padding:0;box-sizing:border-box}html{scroll-behavior:smooth}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);line-height:1.6;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.app{display:flex;min-height:100vh}
+
+/* Sidebar */
+.sb{width:260px;min-width:260px;background:var(--surface);border-right:1px solid var(--border);padding:24px 0;position:sticky;top:0;height:100vh;overflow-y:auto;display:flex;flex-direction:column}
+.sb-brand{padding:0 20px 20px;border-bottom:1px solid var(--border);margin-bottom:8px}
+.sb-brand h1{font-family:'Fraunces',serif;font-size:20px;font-weight:500;color:var(--accent-amber);letter-spacing:-.02em}
+.sb-brand .sub{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.1em;margin-top:4px}
+/* Mode Tabs */
+.mode-tabs{display:flex;gap:2px;margin:12px 16px;background:var(--surface-2);border-radius:8px;padding:3px}
+.mode-tab{flex:1;text-align:center;padding:7px 4px;border-radius:6px;font-size:11px;font-weight:600;color:var(--text-muted);cursor:pointer;text-transform:uppercase;letter-spacing:.06em;transition:all .15s}
+.mode-tab:hover{color:var(--text-dim)}
+.mode-tab.active{background:var(--surface);color:var(--accent-amber);box-shadow:var(--shadow)}
+.nav-sec{padding:4px 16px}
+.nav-label{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);padding:8px 8px 4px;font-weight:600}
+.nav-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:7px;cursor:pointer;font-size:12.5px;color:var(--text-dim);transition:all .15s;text-decoration:none;user-select:none}
+.nav-item:hover{background:var(--surface-2);color:var(--text)}
+.nav-item.active{background:var(--accent-amber-dim);color:var(--accent-amber);font-weight:500}
+.nav-item .dot{width:5px;height:5px;border-radius:50%;background:var(--text-muted);flex-shrink:0}
+.nav-item.active .dot{background:var(--accent-amber)}
+.nav-item[style*="display:none"]{display:none!important}
+.sb-foot{margin-top:auto;padding:12px 20px;border-top:1px solid var(--border)}
+.sb-foot p{font-size:10px;color:var(--text-muted);line-height:1.5}
+.ver{display:inline-flex;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);background:var(--surface-2);padding:3px 8px;border-radius:4px;margin-top:6px}
+.pb{display:flex;align-items:center;gap:6px;width:100%;padding:8px 10px;border-radius:7px;cursor:pointer;font-size:12px;color:var(--text-dim);transition:all .15s;border:1px solid var(--border);background:none;font-family:inherit;margin-top:8px;text-align:left}
+.pb:hover{background:var(--surface-2);color:var(--text)}
+
+/* Mobile */
+.mnav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);z-index:100;padding:6px 8px;overflow-x:auto;white-space:nowrap}
+.mnav button{display:inline-block;padding:7px 12px;border-radius:6px;font-size:11px;font-weight:500;color:var(--text-dim);cursor:pointer;border:none;background:none;font-family:inherit}
+.mnav button.active{background:var(--accent-amber-dim);color:var(--accent-amber)}
+
+/* Main */
+.main{flex:1;max-width:920px;margin:0 auto;padding:44px 52px 120px}
+.sec{display:none;animation:fu .3s ease}.sec.active{display:block}
+@keyframes fu{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+/* Typo */
+.sh{margin-bottom:36px}
+.sh .ey{font-size:11px;text-transform:uppercase;letter-spacing:.14em;color:var(--accent-amber);font-weight:600;margin-bottom:6px}
+.sh h2{font-family:'Fraunces',serif;font-size:30px;font-weight:500;letter-spacing:-.03em;line-height:1.2}
+.sh .ld{margin-top:10px;font-size:14.5px;color:var(--text-dim);max-width:640px;line-height:1.7}
+h3{font-family:'Fraunces',serif;font-size:19px;font-weight:500;margin-bottom:10px;letter-spacing:-.02em}
+p{margin-bottom:12px;font-size:14px;color:var(--text-dim)}
+strong{color:var(--text);font-weight:600}
+code{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--accent-amber);background:var(--surface-2);padding:2px 5px;border-radius:4px}
+.sep{height:1px;background:var(--border);margin:32px 0}
+
+/* Badges */
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;padding:3px 8px;border-radius:4px;margin-left:6px;vertical-align:middle}
+.badge.official{background:var(--accent-green-dim);color:var(--accent-green)}
+.badge.official::before{content:'✓'}
+.badge.opinionated{background:var(--accent-purple-dim);color:var(--accent-purple)}
+.badge.opinionated::before{content:'◆'}
+.badge.estimate{background:var(--accent-amber-dim);color:var(--accent-amber)}
+.badge.estimate::before{content:'~'}
+.verified{font-size:10px;color:var(--text-muted);font-style:italic;margin-top:4px}
+
+/* Cards */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;margin-bottom:16px}
+
+/* Stream */
+.sg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:28px}
+.sc{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:22px;position:relative;overflow:hidden}
+.sc::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.sc.fx::before{background:var(--fixed)}.sc.vr::before{background:var(--variable)}.sc.hy::before{background:var(--hybrid)}
+.stag{display:inline-block;font-size:10px;text-transform:uppercase;letter-spacing:.08em;font-weight:600;padding:3px 7px;border-radius:4px;margin-bottom:10px}
+.sc.fx .stag{background:var(--fixed-dim);color:var(--fixed)}
+.sc.vr .stag{background:var(--variable-dim);color:var(--variable)}
+.sc.hy .stag{background:var(--hybrid-dim);color:var(--hybrid)}
+.sc h4{font-family:'Fraunces',serif;font-size:16px;font-weight:500;margin-bottom:6px}
+.sc p{font-size:12.5px;margin:0}
+
+/* Flow bars */
+.tfv{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:28px;margin:20px 0 28px}
+.fr{display:flex;align-items:center;gap:10px;margin-bottom:14px}.fr:last-child{margin-bottom:0}
+.fl{width:110px;flex-shrink:0;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+.fbc{flex:1;height:32px;background:var(--surface-2);border-radius:6px;overflow:hidden}
+.fb{height:100%;border-radius:6px;display:flex;align-items:center;padding:0 10px;font-size:11px;font-weight:500;font-family:'JetBrains Mono',monospace;color:var(--bg);transition:width 1s cubic-bezier(.22,1,.36,1);width:0}
+.fb.a{width:var(--tw)}.fb.i{background:var(--accent-blue)}.fb.o{background:var(--accent-amber)}
+.fp{width:90px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);flex-shrink:0}
+
+/* Concept Grid */
+.cg{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0}
+.cc{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:22px}
+.cc .ci{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;margin-bottom:12px}
+.cc h4{font-size:14px;font-weight:600;margin-bottom:4px}
+.cc p{font-size:12.5px;margin:0}
+
+/* Tier Grid */
+.tg{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0}
+.tg.full{grid-template-columns:repeat(4,1fr)}
+.tc{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 12px;text-align:center;transition:all .2s}
+.tc:hover{border-color:var(--border-light);transform:translateY(-2px)}
+.tc.hl{border-color:var(--accent-amber)}
+.tn{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+.tp{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:500;color:var(--text);margin-bottom:1px}
+.tu{font-size:10px;color:var(--text-muted);margin-bottom:10px}
+.tf{list-style:none;padding:0;text-align:left}
+.tf li{font-size:11px;color:var(--text-dim);padding:3px 0;display:flex;align-items:center;gap:5px}
+.tf li::before{content:'·';color:var(--text-muted);font-weight:700}
+.tf li.no{opacity:.4;text-decoration:line-through}
+
+/* Callout */
+.co{border-left:3px solid var(--accent-amber);background:var(--accent-amber-dim);padding:14px 18px;border-radius:0 var(--radius) var(--radius) 0;margin:16px 0}
+.co p{color:var(--text);margin:0;font-size:13px}.co strong{color:var(--accent-amber)}
+.co.bl{border-left-color:var(--accent-blue);background:var(--accent-blue-dim)}.co.bl strong{color:var(--accent-blue)}
+.co.rd{border-left-color:var(--accent-red);background:var(--accent-red-dim)}.co.rd strong{color:var(--accent-red)}
+.co.gn{border-left-color:var(--accent-green);background:var(--accent-green-dim)}.co.gn strong{color:var(--accent-green)}
+
+/* Formula */
+.fx-box{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--accent-amber);margin:14px 0;text-align:center}
+.fx-box .dim{color:var(--text-muted)}
+
+/* Checklist */
+.cl{list-style:none;padding:0}
+.cl li{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;color:var(--text-dim)}
+.cl li:last-child{border-bottom:none}
+.cb{width:18px;height:18px;border:2px solid var(--border-light);border-radius:4px;flex-shrink:0;margin-top:1px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.cb.ck{background:var(--accent-green);border-color:var(--accent-green)}
+.cb.ck::after{content:'✓';color:var(--bg);font-size:11px;font-weight:700}
+
+/* Gauge */
+.gr{display:flex;align-items:center;gap:14px;margin:8px 0}
+.gl{width:85px;font-size:11px;font-weight:500;color:var(--text-dim);flex-shrink:0}
+.gt{flex:1;height:7px;background:var(--surface-3);border-radius:4px;overflow:hidden}
+.gf{height:100%;border-radius:4px}
+.gv{width:55px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);text-align:right;flex-shrink:0}
+
+/* Decision Tree */
+.dn{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;margin-bottom:2px;cursor:pointer;transition:all .15s}
+.dn:hover{border-color:var(--border-light)}
+.dnh{display:flex;align-items:center;justify-content:space-between}
+.dnh h4{font-size:13px;font-weight:600;display:flex;align-items:center;gap:7px}
+.dnh .aw{transition:transform .2s;color:var(--text-muted);font-size:13px}
+.dn.op .aw{transform:rotate(90deg)}
+.dnb{display:none;padding-top:12px;font-size:13px;color:var(--text-dim);line-height:1.7}
+.dn.op .dnb{display:block}
+
+/* Plan Selector */
+.pq{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;margin-bottom:14px;transition:opacity .3s}
+.pq.done{opacity:.5}.pq.done:hover{opacity:.8}
+.pq h4{font-size:14px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:7px}
+.pq .sn{background:var(--accent-amber);color:var(--bg);width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+.po{display:flex;gap:8px;flex-wrap:wrap}
+.po button{padding:9px 16px;border-radius:7px;border:1px solid var(--border);background:var(--surface-2);cursor:pointer;font-size:12.5px;color:var(--text-dim);transition:all .15s;font-family:inherit}
+.po button:hover{border-color:var(--border-light);color:var(--text)}
+.po button.sel{border-color:var(--accent-amber);background:var(--accent-amber-dim);color:var(--accent-amber);font-weight:500}
+.pr{background:var(--surface);border:2px solid var(--accent-amber);border-radius:var(--radius-lg);padding:28px;text-align:center;margin-top:16px}
+.pr h3{color:var(--accent-amber)}.pr .rp{font-family:'JetBrains Mono',monospace;font-size:24px;color:var(--text);margin:6px 0}
+.pr .rd{font-size:12.5px;color:var(--text-dim);max-width:500px;margin:0 auto;line-height:1.7}
+
+/* Mistake Cards */
+.mk{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:22px;margin-bottom:14px;border-left:3px solid var(--accent-red)}
+.mk h4{font-size:14px;font-weight:600;margin-bottom:4px;color:var(--accent-red)}
+.mk .im{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--accent-amber);margin-bottom:6px}
+.mk p{font-size:13px;margin-bottom:0}
+.mk .fix{margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:12.5px;color:var(--accent-green)}
+
+/* Benchmark */
+.bk{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:22px;margin-bottom:14px}
+.bk h4{font-size:13px;font-weight:600;margin-bottom:3px}
+.bk .bl{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:10px}
+.bbt{height:28px;background:var(--surface-2);border-radius:5px;position:relative;margin-bottom:5px;overflow:hidden}
+.bbr{position:absolute;top:0;height:100%;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:var(--bg)}
+.bbl{display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);font-family:'JetBrains Mono',monospace}
+
+/* Calc */
+.cr{display:flex;align-items:center;gap:10px;margin:8px 0;flex-wrap:wrap}
+.clb{width:170px;font-size:12.5px;color:var(--text-dim);flex-shrink:0}
+.cin{background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-family:'JetBrains Mono',monospace;font-size:12.5px;color:var(--text);width:110px;outline:none}
+.cin:focus{border-color:var(--accent-amber)}
+.csl{background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-family:'DM Sans',sans-serif;font-size:12.5px;color:var(--text);outline:none;cursor:pointer}
+.csl option{background:var(--surface-2);color:var(--text)}
+.cres{background:var(--accent-amber-dim);border:1px solid rgba(212,165,74,.25);border-radius:var(--radius);padding:18px 20px;margin-top:14px;text-align:center}
+.cres .big{font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:500;color:var(--accent-amber)}
+.cres p{font-size:11px;color:var(--text-dim);margin:3px 0 0}
+.cres.sv{background:var(--accent-green-dim);border-color:rgba(93,171,128,.25)}.cres.sv .big{color:var(--accent-green)}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:0;margin:16px 0;border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.cmp>div{padding:20px}
+.cmp>div:first-child{border-right:1px solid var(--border);background:var(--surface)}
+.cmp>div:last-child{background:var(--accent-green-dim)}
+.cmp h4{font-size:13px;font-weight:600;margin-bottom:12px;text-align:center}
+
+/* Glossary */
+.gg{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0}
+.gi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px}
+.gi dt{font-size:12px;font-weight:600;color:var(--accent-amber);margin-bottom:3px;font-family:'JetBrains Mono',monospace}
+.gi dd{font-size:12px;color:var(--text-dim);margin:0}
+
+/* Tooltip */
+.tip{position:relative;cursor:help;border-bottom:1px dashed var(--accent-amber);color:var(--text)}
+.tip:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 5px);left:50%;transform:translateX(-50%);background:var(--surface-3);border:1px solid var(--border-light);color:var(--text);font-size:11px;font-weight:400;padding:7px 10px;border-radius:6px;white-space:normal;width:220px;z-index:10;pointer-events:none;line-height:1.5;text-align:left}
+
+/* Stacked */
+.sbs{margin:24px 0}
+.sbl{font-size:11px;color:var(--text-dim);margin-bottom:6px;display:flex;justify-content:space-between}
+.sb-bar{display:flex;height:40px;border-radius:7px;overflow:hidden;margin-bottom:5px}
+.sb-bar>div{display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:var(--bg)}
+.sl{display:flex;flex-wrap:wrap;gap:14px;margin-top:8px}
+.sl .li{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-dim)}
+.sl .ld{width:9px;height:9px;border-radius:3px;flex-shrink:0}
+
+/* Pricing table */
+.ptbl{width:100%;border-collapse:separate;border-spacing:0;font-size:12.5px;margin:14px 0}
+.ptbl th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);font-weight:600;padding:8px 12px;border-bottom:1px solid var(--border)}
+.ptbl td{padding:10px 12px;border-bottom:1px solid var(--border);color:var(--text-dim)}
+.ptbl tr:last-child td{border-bottom:none}
+.ptbl .mn{font-weight:600;color:var(--text)}
+.ptbl .mo{font-family:'JetBrains Mono',monospace;font-size:12px}
+
+/* Workspace */
+.wso{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px;margin-bottom:14px}
+.wso-h{display:flex;align-items:center;gap:8px;margin-bottom:14px;font-size:12px;font-weight:600}
+.wso-h span{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);background:var(--surface-3);padding:2px 7px;border-radius:4px}
+.wr{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.wb{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px}
+.wb h5{font-size:12px;font-weight:600;margin-bottom:4px}
+.wb p{font-size:11px;margin:0;color:var(--text-muted)}
+
+/* Print */
+@media print{
+  body{background:#fff!important;color:#222!important;font-size:10px}
+  .sb,.mnav,.pb,.po button,.cb,.mode-tabs{display:none!important}
+  .main{padding:0!important;max-width:100%!important}
+  .sec{display:block!important;page-break-inside:avoid;margin-bottom:20px;animation:none!important}
+  .card,.sc,.cc,.mk,.bk,.co,.fx-box,.cres,.pr,.pq,.dn,.gi,.wso,.wb,.ptbl td,.ptbl th{background:#f8f8f6!important;border-color:#ddd!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .co p,.co strong,.sh h2,.sh .ld,h3,p,strong,.cl li,.dnb,.cc p,.cc h4,.sc h4,.sc p,.mk p,.mk .fix,.bk h4,.gi dd,.ptbl td,.ptbl .mn{color:#222!important}
+  .sh .ey,.stag,.tn,.bk .bl,.badge{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .sb-bar>div,.fb,.gf,.bbr{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .app{display:block}.sh{page-break-after:avoid}
+}
+@media(max-width:900px){
+  .sb{display:none}.mnav{display:flex}.main{padding:28px 18px 100px}
+  .sg,.wr{grid-template-columns:1fr}.cg,.gg,.cmp{grid-template-columns:1fr}
+  .tg,.tg.full{grid-template-columns:repeat(2,1fr)}
+  .cr{flex-direction:column;align-items:flex-start}.clb{width:auto}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="sb">
+    <div class="sb-brand"><h1>AI FinOps</h1><div class="sub">Anthropic Claude</div></div>
+    <div class="mode-tabs">
+      <div class="mode-tab active" data-mode="learn">Learn</div>
+      <div class="mode-tab" data-mode="diagnose">Diagnose</div>
+      <div class="mode-tab" data-mode="optimize">Optimize</div>
+    </div>
+    <!-- LEARN -->
+    <div class="nav-sec mode-learn">
+      <div class="nav-label">Foundations</div>
+      <a class="nav-item active" data-section="overview"><span class="dot"></span> The Big Picture</a>
+      <a class="nav-item" data-section="three-streams"><span class="dot"></span> Three Spending Streams</a>
+      <a class="nav-item" data-section="token-economics"><span class="dot"></span> Token Economics</a>
+      <a class="nav-item" data-section="seat-plans"><span class="dot"></span> Plans &amp; Pricing</a>
+      <a class="nav-item" data-section="api-costs"><span class="dot"></span> API Cost Anatomy</a>
+      <a class="nav-item" data-section="claude-code"><span class="dot"></span> Claude Code Costs</a>
+      <a class="nav-item" data-section="glossary"><span class="dot"></span> Glossary</a>
+    </div>
+    <!-- DIAGNOSE -->
+    <div class="nav-sec mode-diagnose" style="display:none">
+      <div class="nav-label">Identify</div>
+      <a class="nav-item" data-section="plan-selector"><span class="dot"></span> Which Plan Do I Need?</a>
+      <a class="nav-item" data-section="console-guide"><span class="dot"></span> Console Walkthrough</a>
+      <a class="nav-item" data-section="benchmarks"><span class="dot"></span> Am I Normal?</a>
+      <a class="nav-item" data-section="mistakes"><span class="dot"></span> Common Mistakes</a>
+    </div>
+    <!-- OPTIMIZE -->
+    <div class="nav-sec mode-optimize" style="display:none">
+      <div class="nav-label">Take Action</div>
+      <a class="nav-item" data-section="optimization"><span class="dot"></span> Optimization Levers</a>
+      <a class="nav-item" data-section="calculator"><span class="dot"></span> Cost Calculator</a>
+      <a class="nav-item" data-section="maturity"><span class="dot"></span> FinOps Maturity Model</a>
+    </div>
+    <div class="sb-foot">
+      <p>Understanding, diagnosing, and optimizing Anthropic Claude costs.</p>
+      <div class="ver">v3.1 · Apr 2026</div>
+      <button class="pb" onclick="window.print()">🖨 Print / Export PDF</button>
+    </div>
+  </nav>
+
+  <div class="mnav">
+    <button class="active" data-section="overview">Overview</button>
+    <button data-section="three-streams">Streams</button>
+    <button data-section="token-economics">Tokens</button>
+    <button data-section="seat-plans">Plans</button>
+    <button data-section="api-costs">API</button>
+    <button data-section="claude-code">Code</button>
+    <button data-section="plan-selector">Selector</button>
+    <button data-section="console-guide">Console</button>
+    <button data-section="benchmarks">Benchmarks</button>
+    <button data-section="mistakes">Mistakes</button>
+    <button data-section="optimization">Optimize</button>
+    <button data-section="calculator">Calc</button>
+    <button data-section="maturity">Maturity</button>
+    <button data-section="glossary">Glossary</button>
+  </div>
+
+  <main class="main">
+    <!-- ═══ OVERVIEW ═══ -->
+    <div class="sec active" id="overview">
+      <div class="sh"><div class="ey">Learn · Foundations</div><h2>Which Claude costs do you actually have?</h2><p class="ld">Every dollar your organization pays Anthropic falls into one of three billing streams. Knowing which streams apply to you is step one. From there, each stream has its own forecasting method, monitoring tool, and optimization strategy.</p></div>
+      <div class="sg">
+        <div class="sc fx"><div class="stag">Fixed</div><h4>Seat Subscriptions</h4><p>Monthly per-user fees: Pro, Max, Team, or Enterprise. Predictable, billed regardless of usage.</p></div>
+        <div class="sc vr"><div class="stag">Variable</div><h4>API Token Usage</h4><p>Pay-per-token for every API call. Varies with prompt length, output, model, and volume.</p></div>
+        <div class="sc hy"><div class="stag">Hybrid</div><h4>Claude Code</h4><p>Included in some plans. Overages billed at standard API token rates.</p></div>
+      </div>
+      <div class="card">
+        <h3>A Typical Bill Breakdown</h3>
+        <div class="sbs">
+          <div class="sbl"><span>Illustrative monthly spend</span><span style="font-family:'JetBrains Mono',monospace">$5,000/mo example</span></div>
+          <div class="sb-bar"><div style="flex:35;background:var(--fixed)">35%</div><div style="flex:48;background:var(--variable)">48%</div><div style="flex:17;background:var(--hybrid)">17%</div></div>
+          <div class="sl"><div class="li"><div class="ld" style="background:var(--fixed)"></div> Seats (fixed)</div><div class="li"><div class="ld" style="background:var(--variable)"></div> API (variable)</div><div class="li"><div class="ld" style="background:var(--hybrid)"></div> Claude Code (hybrid)</div></div>
+        </div>
+        <p style="font-size:12px" class="verified"><span class="badge estimate">Illustrative</span> The exact split varies. API-heavy orgs see 70%+ variable; chat-heavy teams lean toward seats.</p>
+      </div>
+      <div class="cg">
+        <div class="cc"><div class="ci" style="background:var(--accent-amber-dim);color:var(--accent-amber)">📊</div><h4>Visibility</h4><p>Know where the money goes: by team, product, model.</p></div>
+        <div class="cc"><div class="ci" style="background:var(--accent-blue-dim);color:var(--accent-blue)">🏷</div><h4>Attribution</h4><p>Every dollar traceable to a workspace, key, team, or product.</p></div>
+        <div class="cc"><div class="ci" style="background:var(--accent-green-dim);color:var(--accent-green)">🎯</div><h4>Optimization</h4><p>Identify waste: wrong models, redundant prompts, unused seats.</p></div>
+        <div class="cc"><div class="ci" style="background:var(--accent-purple-dim);color:var(--accent-purple)">🔒</div><h4>Governance</h4><p>Limits, policies, rotation schedules prevent drift.</p></div>
+      </div>
+    </div>
+
+    <!-- ═══ THREE STREAMS ═══ -->
+    <div class="sec" id="three-streams">
+      <div class="sh"><div class="ey">Learn · Foundations</div><h2>Three Spending Streams</h2><p class="ld">Anthropic bills through three mechanisms. Each has its own pricing model, monitoring tools, and optimization strategies.</p></div>
+      <div class="card">
+        <h3>How They Interact</h3>
+        <p>A developer on a Team seat gets Claude Code included up to a plan allowance. Premium seats get a larger allowance (6.25x Pro vs 1.25x on Standard). But if that developer also uses API keys in a product, those variable charges stack on top of their seat cost.</p>
+        <div class="co bl"><p><strong>Rule of thumb:</strong> Attribute seat costs to people (headcount budget) and API costs to products (product budget). Claude Code overage goes to the project budget.</p></div>
+      </div>
+      <div class="card">
+        <h3>Forecasting Difficulty <span class="badge opinionated">Opinionated</span></h3>
+        <div class="gr"><div class="gl">Seats</div><div class="gt"><div class="gf" style="width:90%;background:var(--accent-green)"></div></div><div class="gv">Easy</div></div>
+        <div class="gr"><div class="gl">API Tokens</div><div class="gt"><div class="gf" style="width:25%;background:var(--accent-red)"></div></div><div class="gv">Hard</div></div>
+        <div class="gr"><div class="gl">Claude Code</div><div class="gt"><div class="gf" style="width:50%;background:var(--accent-amber)"></div></div><div class="gv">Medium</div></div>
+      </div>
+    </div>
+
+    <!-- ═══ TOKEN ECONOMICS ═══ -->
+    <div class="sec" id="token-economics">
+      <div class="sh"><div class="ey">Learn · Foundations</div><h2>Token Economics</h2><p class="ld">Tokens are the fundamental unit of API cost.</p></div>
+      <div class="card">
+        <h3>What Is a Token?</h3>
+        <p>A chunk of text, roughly 3/4 of a word. A 200-word email ≈ 270 tokens. A 10-page doc ≈ 4,000-5,000 tokens.</p>
+        <div class="fx-box"><span class="dim">Cost =</span> (Input Tokens × Input Price) <span class="dim">+</span> (Output Tokens × Output Price)</div>
+      </div>
+      <h3>Token Cost by Model <span class="badge official">Official</span></h3>
+      <p class="verified">Last verified: Apr 10, 2026 against platform.claude.com/docs/en/about-claude/pricing</p>
+      <div class="tfv">
+        <p style="font-size:12px;margin-bottom:14px"><strong>Input</strong> per 1M tokens</p>
+        <div class="fr"><div class="fl" style="color:var(--accent-blue)">Haiku 4.5</div><div class="fbc"><div class="fb i" style="--tw:10%">$1</div></div><div class="fp">$1.00</div></div>
+        <div class="fr"><div class="fl" style="color:var(--accent-blue)">Sonnet 4.6</div><div class="fbc"><div class="fb i" style="--tw:30%">$3</div></div><div class="fp">$3.00</div></div>
+        <div class="fr"><div class="fl" style="color:var(--accent-blue)">Opus 4.6</div><div class="fbc"><div class="fb i" style="--tw:50%">$5</div></div><div class="fp">$5.00</div></div>
+        <div style="margin-top:18px"><p style="font-size:12px;margin-bottom:14px"><strong>Output</strong> per 1M tokens</p>
+        <div class="fr"><div class="fl" style="color:var(--accent-amber)">Haiku 4.5</div><div class="fbc"><div class="fb o" style="--tw:20%">$5</div></div><div class="fp">$5.00</div></div>
+        <div class="fr"><div class="fl" style="color:var(--accent-amber)">Sonnet 4.6</div><div class="fbc"><div class="fb o" style="--tw:60%">$15</div></div><div class="fp">$15.00</div></div>
+        <div class="fr"><div class="fl" style="color:var(--accent-amber)">Opus 4.6</div><div class="fbc"><div class="fb o" style="--tw:100%">$25</div></div><div class="fp">$25.00</div></div></div>
+      </div>
+    </div>
+
+    <!-- ═══ SEAT PLANS ═══ -->
+    <div class="sec" id="seat-plans">
+      <div class="sh"><div class="ey">Learn · Deep Dive</div><h2>Plans &amp; Pricing</h2><p class="ld">A complete view of Anthropic's current plan lineup, including billing frequency differences and Claude Code availability.</p></div>
+
+      <h3>Individual Plans <span class="badge official">Official</span></h3>
+      <p class="verified">Last verified: Apr 10, 2026 against claude.com/pricing</p>
+      <div class="tg">
+        <div class="tc"><div class="tn">Free</div><div class="tp">$0</div><div class="tu">forever</div><ul class="tf"><li>Sonnet 4.5 only</li><li>~20 msgs/day</li><li class="no">No Claude Code</li><li class="no">No Cowork</li></ul></div>
+        <div class="tc hl"><div class="tn">Pro</div><div class="tp">$20</div><div class="tu">$17/mo if annual ($200/yr)</div><ul class="tf"><li>All models</li><li>Claude Code ✓</li><li>Cowork ✓</li><li>~5x Free usage</li></ul></div>
+        <div class="tc"><div class="tn">Max</div><div class="tp">$100-$200</div><div class="tu">5x ($100) or 20x ($200)</div><ul class="tf"><li>5x or 20x Pro usage</li><li>Claude Code ✓</li><li>Higher output limits</li><li>Priority access</li></ul></div>
+      </div>
+
+      <h3>Team &amp; Enterprise Plans <span class="badge official">Official</span></h3>
+      <p class="verified">Last verified: Apr 10, 2026 against claude.com/pricing and support.claude.com</p>
+      <table class="ptbl">
+        <tr><th>Plan</th><th>Annual</th><th>Monthly</th><th>Min Seats</th><th>Claude Code</th></tr>
+        <tr><td class="mn">Team Standard</td><td class="mo">$20/seat</td><td class="mo">$25/seat</td><td>5</td><td>Included</td></tr>
+        <tr><td class="mn">Team Premium</td><td class="mo">$100/seat</td><td class="mo">$125/seat</td><td>5</td><td>Included</td></tr>
+        <tr><td class="mn">Enterprise (self-serve)</td><td class="mo">$20/seat + API usage</td><td class="mo">—</td><td>20</td><td>Included</td></tr>
+        <tr><td class="mn">Enterprise (sales)</td><td class="mo">Custom</td><td class="mo">—</td><td>Contact sales</td><td>Included</td></tr>
+      </table>
+
+      <div class="co"><p><strong>Annual vs Monthly matters.</strong> Team Standard is $20/seat annual vs $25 monthly, a 20% difference. Team Premium is $100 vs $125, also 20%. For a 20-person team on Standard, that's $1,200/year saved by committing annually.</p></div>
+
+      <div class="card">
+        <h3>Claude Code Availability <span class="badge official">Official</span></h3>
+        <p class="verified">Last verified: Apr 10, 2026 against claude.com/product/claude-code</p>
+        <p>Claude Code is available with:</p>
+        <ul class="cl" style="margin-top:4px">
+          <li><span style="color:var(--accent-green);flex-shrink:0">✓</span> Pro plan ($20/mo)</li>
+          <li><span style="color:var(--accent-green);flex-shrink:0">✓</span> Max plan ($100-200/mo)</li>
+          <li><span style="color:var(--accent-green);flex-shrink:0">✓</span> Team Standard seats ($20-25/seat)</li>
+          <li><span style="color:var(--accent-green);flex-shrink:0">✓</span> Team Premium seats ($100-125/seat)</li>
+          <li><span style="color:var(--accent-green);flex-shrink:0">✓</span> Enterprise plans</li>
+          <li><span style="color:var(--accent-green);flex-shrink:0">✓</span> Anthropic Console / API account (pay-per-token)</li>
+          <li><span style="color:var(--accent-red);flex-shrink:0">✗</span> Free plan (not available)</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3>Enterprise: Not Just "Custom" <span class="badge opinionated">Opinionated</span></h3>
+        <p>Enterprise is often assumed to be a single black-box "contact sales" tier. In practice, Anthropic offers two Enterprise paths:</p>
+        <p><strong>Self-serve Enterprise</strong> ($20/seat + API usage, min 20 seats, annual commitment): organizations can start today without contacting sales. It includes SSO, SCIM, audit logs, 500K context window, and compliance features.</p>
+        <p><strong>Sales-assisted Enterprise</strong> (custom pricing, contact sales): for organizations needing tailored terms, usage commitments, invoicing, product bundling, and HIPAA-ready configurations. Minimum seat counts are negotiated.</p>
+        <p>The self-serve path means Enterprise isn't necessarily more expensive per-seat than Team, it's $20/seat (same as Team Standard annual) plus usage-based API charges. The value is in the governance and compliance features, not a price premium on the seat itself.</p>
+      </div>
+    </div>
+
+    <!-- ═══ API COSTS ═══ -->
+    <div class="sec" id="api-costs">
+      <div class="sh"><div class="ey">Learn · Deep Dive</div><h2>API Cost Anatomy</h2><p class="ld">Every API call has multiple cost components.</p></div>
+      <div class="cg">
+        <div class="cc" style="border-left:3px solid var(--accent-blue)"><h4 style="color:var(--accent-blue)">Input Tokens · ~60-75%</h4><p>System prompt, user message, documents, history, tool definitions. Cheaper per-token but high volume.</p></div>
+        <div class="cc" style="border-left:3px solid var(--accent-amber)"><h4 style="color:var(--accent-amber)">Output Tokens · ~20-35%</h4><p>Response text, thinking, tool calls, code. 3-5x more expensive per token than input.</p></div>
+        <div class="cc" style="border-left:3px solid var(--accent-green)"><h4 style="color:var(--accent-green)">Feature Charges · ~5-15%</h4><p>Web search, code execution, fast mode (6x rates), extended caching. Not visible in token counts.</p></div>
+        <div class="cc" style="border-left:3px solid var(--accent-purple)"><h4 style="color:var(--accent-purple)">Discounts</h4><p>Batch API (50% off), prompt cache reads (90% off input), cache writes (1.25x input). Check the Cost page.</p></div>
+      </div>
+      <div class="co"><p><strong>Usage ≠ Cost.</strong> If tokens are flat but cost rises, someone switched models. If tokens spike but cost doesn't, caching is working. Always compare both Console pages.</p></div>
+    </div>
+
+    <!-- ═══ CLAUDE CODE ═══ -->
+    <div class="sec" id="claude-code">
+      <div class="sh"><div class="ey">Learn · Deep Dive</div><h2>Claude Code Costs</h2><p class="ld">CLI coding assistant with hybrid billing: included allowances plus variable overages.</p></div>
+      <div class="card">
+        <h3>Billing Model</h3>
+        <p>On subscription plans (Pro, Max, Team Standard, Team Premium, Enterprise), Claude Code draws from included usage. Once exceeded, overages are billed at standard API rates for the model used. On a Console/API account, all usage is pay-per-token from the start.</p>
+        <div class="co"><p><strong>Typical spend:</strong> <span class="badge estimate">Estimate</span> Active developers average $6-12/day. Heavy agentic workflows reach $20-30/day. That's $100-600+/month per developer.</p></div>
+      </div>
+      <div class="cg">
+        <div class="cc"><div class="ci" style="background:var(--hybrid-dim);color:var(--hybrid)">⌨</div><h4>/cost Command</h4><p>Real-time session spend in the terminal.</p></div>
+        <div class="cc"><div class="ci" style="background:var(--accent-blue-dim);color:var(--accent-blue)">📈</div><h4>Analytics API</h4><p>Daily per-user metrics via Admin API.</p></div>
+        <div class="cc"><div class="ci" style="background:var(--accent-green-dim);color:var(--accent-green)">🔑</div><h4>Key Hygiene</h4><p>Disable keys from departed team members.</p></div>
+        <div class="cc"><div class="ci" style="background:var(--accent-red-dim);color:var(--accent-red)">⚠</div><h4>Spend Limits</h4><p>Set per-user caps. No limit = unbounded risk.</p></div>
+      </div>
+    </div>
+
+    <!-- ═══ PLAN SELECTOR ═══ -->
+    <div class="sec" id="plan-selector">
+      <div class="sh"><div class="ey">Diagnose</div><h2>Which Plan Do I Need? <span class="badge opinionated">Opinionated</span></h2><p class="ld">Answer five questions to get a recommended configuration. Recommendations reflect the author's judgment, not official Anthropic guidance.</p></div>
+      <div class="pq" id="psQ1"><h4><span class="sn">1</span> How many people need Claude access?</h4><div class="po"><button onclick="psA(1,'1-4')">1-4</button><button onclick="psA(1,'5-20')">5-20</button><button onclick="psA(1,'20-50')">20-50</button><button onclick="psA(1,'50+')">50+</button></div></div>
+      <div class="pq" id="psQ2" style="display:none"><h4><span class="sn">2</span> Do developers need Claude Code?</h4><div class="po"><button onclick="psA(2,'no')">No</button><button onclick="psA(2,'some')">Some (1-5)</button><button onclick="psA(2,'most')">Most / all</button></div></div>
+      <div class="pq" id="psQ3" style="display:none"><h4><span class="sn">3</span> SSO, audit logs, or HIPAA needed?</h4><div class="po"><button onclick="psA(3,'no')">No</button><button onclick="psA(3,'sso')">SSO is enough</button><button onclick="psA(3,'full')">Full compliance</button></div></div>
+      <div class="pq" id="psQ4" style="display:none"><h4><span class="sn">4</span> API integration into products?</h4><div class="po"><button onclick="psA(4,'no')">No, chat only</button><button onclick="psA(4,'light')">Light API</button><button onclick="psA(4,'heavy')">Heavy / production</button></div></div>
+      <div class="pq" id="psQ5" style="display:none"><h4><span class="sn">5</span> How often do users hit limits?</h4><div class="po"><button onclick="psA(5,'rarely')">Rarely</button><button onclick="psA(5,'sometimes')">Sometimes</button><button onclick="psA(5,'often')">Often</button></div></div>
+      <div id="psR" style="display:none"></div>
+      <button id="psRst" style="display:none;margin-top:12px;padding:8px 16px;border-radius:7px;border:1px solid var(--border);background:none;color:var(--text-dim);cursor:pointer;font-family:inherit;font-size:12px" onclick="psReset()">↺ Start Over</button>
+    </div>
+
+    <!-- ═══ CONSOLE GUIDE ═══ -->
+    <div class="sec" id="console-guide">
+      <div class="sh"><div class="ey">Diagnose</div><h2>Console Walkthrough</h2><p class="ld">The Anthropic Console at console.anthropic.com is the primary interface.</p></div>
+      <div class="wso"><div class="wso-h">🏢 Organization <span>Recommended Structure</span></div>
+        <div class="wr">
+          <div class="wb"><h5>Product_API</h5><p>Customer-facing keys</p></div>
+          <div class="wb"><h5>Internal_Tools</h5><p>Automation &amp; research</p></div>
+          <div class="wb"><h5>Claude_Code</h5><p>1 key per developer</p></div>
+        </div>
+      </div>
+      <div class="dn op" onclick="this.classList.toggle('op')"><div class="dnh"><h4>📊 Usage Page</h4><span class="aw">▸</span></div><div class="dnb"><p>Token volume by workspace and key. Filter by model. Click bars for hourly detail. Export CSV monthly as your baseline.</p></div></div>
+      <div class="dn" onclick="this.classList.toggle('op')"><div class="dnh"><h4>💰 Cost Page</h4><span class="aw">▸</span></div><div class="dnb"><p>Dollar amounts with model pricing, feature charges, discounts. Compare with Usage to catch model switches or caching effects.</p></div></div>
+      <div class="dn" onclick="this.classList.toggle('op')"><div class="dnh"><h4>⚙ Workspaces</h4><span class="aw">▸</span></div><div class="dnb"><p>One per product/team. Keys in "Default" = unattributable spend. Create named workspaces and migrate keys.</p></div></div>
+      <div class="dn" onclick="this.classList.toggle('op')"><div class="dnh"><h4>🔑 API Keys</h4><span class="aw">▸</span></div><div class="dnb"><p>Name descriptively. Rotate quarterly. Disable when someone leaves. Never share one key across products.</p></div></div>
+      <div class="dn" onclick="this.classList.toggle('op')"><div class="dnh"><h4>👥 Spend Limits</h4><span class="aw">▸</span></div><div class="dnb"><p>In Settings. Set per-user caps at 2x median spend. "Unlimited" = unbounded risk.</p></div></div>
+      <div class="dn" onclick="this.classList.toggle('op')"><div class="dnh"><h4>📡 Admin API</h4><span class="aw">▸</span></div><div class="dnb"><p><code>/v1/organizations/usage_report/messages</code> for tokens. <code>/v1/organizations/usage_report/claude_code</code> for Code. Group by workspace, model, time. Worth automating above $1K/mo.</p></div></div>
+    </div>
+
+    <!-- ═══ BENCHMARKS ═══ -->
+    <div class="sec" id="benchmarks">
+      <div class="sh"><div class="ey">Diagnose</div><h2>Am I Normal? <span class="badge estimate">Estimates</span></h2><p class="ld">Reference ranges for typical Claude usage. These are approximate ranges based on observed patterns, not official Anthropic data. Use them to identify whether your spend warrants investigation, not as targets.</p></div>
+      <div class="bk"><h4>Small consulting team (5-10 people, mostly chat)</h4><div class="bl">Monthly input tokens</div><div class="bbt"><div class="bbr" style="left:5%;width:20%;background:var(--accent-blue)">20-100M</div></div><div class="bbl"><span>0</span><span>200M</span><span>500M</span></div><div class="bl" style="margin-top:10px">Monthly total spend</div><div class="bbt"><div class="bbr" style="left:3%;width:15%;background:var(--accent-amber)">$300-$800</div></div><div class="bbl"><span>$0</span><span>$2,500</span><span>$5,000</span></div></div>
+      <div class="bk"><h4>Mid-size product team (15-30, API + chat + Code)</h4><div class="bl">Monthly input tokens</div><div class="bbt"><div class="bbr" style="left:15%;width:35%;background:var(--accent-blue)">100M-500M</div></div><div class="bbl"><span>0</span><span>500M</span><span>1B</span></div><div class="bl" style="margin-top:10px">Monthly total spend</div><div class="bbt"><div class="bbr" style="left:10%;width:40%;background:var(--accent-amber)">$1.5K-$5K</div></div><div class="bbl"><span>$0</span><span>$5K</span><span>$10K</span></div></div>
+      <div class="bk"><h4>Single developer using Claude Code</h4><div class="bl">Monthly spend</div><div class="bbt"><div class="bbr" style="left:8%;width:40%;background:var(--accent-purple)">$100-$600</div></div><div class="bbl"><span>$0</span><span>$500</span><span>$1,000</span></div></div>
+    </div>
+
+    <!-- ═══ MISTAKES ═══ -->
+    <div class="sec" id="mistakes">
+      <div class="sh"><div class="ey">Diagnose</div><h2>Common Mistakes <span class="badge opinionated">Opinionated</span></h2><p class="ld">Six costly anti-patterns with typical dollar impact and fixes.</p></div>
+      <div class="mk"><h4>1. Sending full documents when sections suffice</h4><div class="im">3-10x input token waste</div><p>A 50-page contract (60K tokens) to answer one clause question. Only ~3K tokens needed. At Sonnet rates: $0.17 vs $0.009 per request.</p><div class="fix">→ Pre-filter with embeddings or keyword search before sending.</div></div>
+      <div class="mk"><h4>2. Opus for tasks Haiku handles identically</h4><div class="im">5x cost, 0x quality gain</div><p>Classification, extraction, formatting rarely benefit from Opus. Same output, 5x the price.</p><div class="fix">→ A/B test model tiers on actual tasks. Document which genuinely need Opus.</div></div>
+      <div class="mk"><h4>3. No max_tokens cap</h4><div class="im">2-5x output spend</div><p>4,000-token response when 200 suffice. On Sonnet: $0.06 vs $0.003.</p><div class="fix">→ Set max_tokens on every production call. Match to expected response length.</div></div>
+      <div class="mk"><h4>4. Orphaned API keys</h4><div class="im">$50-500/mo unattributed spend</div><p>A departed developer's test integration keeps running. Nobody's monitoring.</p><div class="fix">→ Monthly key audit. Disable unused keys. Name with owner + purpose.</div></div>
+      <div class="mk"><h4>5. Full conversation history every request</h4><div class="im">Quadratic cost growth per conversation</div><p>Turn 20 sends all 19 prior turns. A $0.50 conversation costs $5+.</p><div class="fix">→ Conversation windowing: last N turns, or summarize older context.</div></div>
+      <div class="mk"><h4>6. Unlimited spend limits, no alerts</h4><div class="im">Unbounded, discovered on invoice</div><p>A looping bug runs 100x requests. First sign: $10,000 bill.</p><div class="fix">→ Set dollar caps today. Set up daily Admin API alerts. Same-day implementations.</div></div>
+    </div>
+
+    <!-- ═══ OPTIMIZATION ═══ -->
+    <div class="sec" id="optimization">
+      <div class="sh"><div class="ey">Optimize</div><h2>Optimization Levers</h2><p class="ld">Ordered by typical impact, highest first.</p></div>
+      <div class="card"><h3>1. Prompt Caching <span class="badge official">Official</span></h3><p class="verified">Pricing verified Apr 10, 2026</p><div class="fx-box"><span class="dim">Standard:</span> $3.00/MTok → <span class="dim">Cached read:</span> $0.30/MTok <span class="dim">(90% savings)</span></div><p>Cache writes cost 1.25x. Default TTL: 5 minutes. Best for high-frequency stable prompts.</p></div>
+      <div class="card"><h3>2. Model Routing <span class="badge opinionated">Opinionated</span></h3>
+        <div class="cg" style="margin-top:10px">
+          <div class="cc"><h4 style="color:var(--accent-green)">Haiku — $1/$5</h4><p>Classification, extraction, formatting, validation</p></div>
+          <div class="cc"><h4 style="color:var(--accent-blue)">Sonnet — $3/$15</h4><p>Code gen, doc analysis, reasoning, most production</p></div>
+          <div class="cc"><h4 style="color:var(--accent-amber)">Opus — $5/$25</h4><p>Complex reasoning, nuanced writing</p></div>
+          <div class="cc"><h4 style="color:var(--accent-red)">Opus Fast — $30/$150</h4><p>Latency-critical production only</p></div>
+        </div>
+      </div>
+      <div class="card"><h3>3. Batch API <span class="badge official">Official</span></h3><div class="fx-box"><span class="dim">Sonnet:</span> $3/$15 → <span class="dim">Batch:</span> $1.50/$7.50 <span class="dim">(50% off)</span></div><p>Non-urgent workloads. Results within 24h.</p></div>
+      <div class="card"><h3>4. Prompt Engineering <span class="badge opinionated">Opinionated</span></h3><ul class="cl"><li><div class="cb" onclick="this.classList.toggle('ck')"></div>Trim redundant system prompt instructions</li><li><div class="cb" onclick="this.classList.toggle('ck')"></div>Set <code>max_tokens</code> on every call</li><li><div class="cb" onclick="this.classList.toggle('ck')"></div>JSON output when machine-parsed</li><li><div class="cb" onclick="this.classList.toggle('ck')"></div>Truncate history to relevant turns</li><li><div class="cb" onclick="this.classList.toggle('ck')"></div>Send needed sections, not full documents</li></ul></div>
+    </div>
+
+    <!-- ═══ CALCULATOR ═══ -->
+    <div class="sec" id="calculator">
+      <div class="sh"><div class="ey">Optimize</div><h2>Cost Calculator</h2><p class="ld">Compare before/after optimization scenarios.</p></div>
+      <div class="card">
+        <h3>Multi-Model API Estimator</h3>
+        <div class="cr"><div class="clb">Total input/mo</div><input class="cin" type="number" id="mmI" value="200" min="0" oninput="uMM()"><span style="font-size:12px;color:var(--text-muted)">M tokens</span></div>
+        <div class="cr"><div class="clb">Total output/mo</div><input class="cin" type="number" id="mmO" value="40" min="0" oninput="uMM()"><span style="font-size:12px;color:var(--text-muted)">M tokens</span></div>
+        <div class="sep" style="margin:16px 0"></div>
+        <p style="font-size:12px;font-weight:600;margin-bottom:8px">Model mix (must total 100%):</p>
+        <div class="cr"><div class="clb">Haiku ($1/$5)</div><input class="cin" style="width:70px" type="number" id="mmH" value="20" min="0" max="100" oninput="uMM()"><span style="font-size:12px;color:var(--text-muted)">%</span></div>
+        <div class="cr"><div class="clb">Sonnet ($3/$15)</div><input class="cin" style="width:70px" type="number" id="mmS" value="70" min="0" max="100" oninput="uMM()"><span style="font-size:12px;color:var(--text-muted)">%</span></div>
+        <div class="cr"><div class="clb">Opus ($5/$25)</div><input class="cin" style="width:70px" type="number" id="mmP" value="10" min="0" max="100" oninput="uMM()"><span style="font-size:12px;color:var(--text-muted)">%</span></div>
+        <div id="mmW" style="display:none;font-size:11px;color:var(--accent-red);margin:2px 0 0 182px">⚠ Must total 100%</div>
+        <div class="cmp">
+          <div><h4>Before</h4>
+            <div class="cr"><div class="clb" style="width:100px">Batch %</div><input class="cin" style="width:70px" type="number" id="mmBB" value="0" min="0" max="100" oninput="uMM()"></div>
+            <div class="cr"><div class="clb" style="width:100px">Cache %</div><input class="cin" style="width:70px" type="number" id="mmCB" value="0" min="0" max="100" oninput="uMM()"></div>
+            <div class="cres" style="margin-top:10px"><div class="big" id="mmBf">$1,200</div><p id="mmBd">—</p></div>
+          </div>
+          <div><h4>After</h4>
+            <div class="cr"><div class="clb" style="width:100px">Batch %</div><input class="cin" style="width:70px" type="number" id="mmBA" value="40" min="0" max="100" oninput="uMM()"></div>
+            <div class="cr"><div class="clb" style="width:100px">Cache %</div><input class="cin" style="width:70px" type="number" id="mmCA" value="60" min="0" max="100" oninput="uMM()"></div>
+            <div class="cres sv" style="margin-top:10px"><div class="big" id="mmAf">$540</div><p id="mmAd">—</p></div>
+          </div>
+        </div>
+        <div class="cres sv" style="margin-top:10px"><p style="margin:0 0 2px;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted)">Monthly Savings</p><div class="big" id="mmSv">$660 (55%)</div></div>
+      </div>
+      <div class="card">
+        <h3>Seat Cost Estimator <span class="badge official">Official</span></h3>
+        <p class="verified">Using annual pricing. Last verified Apr 10, 2026.</p>
+        <div class="cr"><div class="clb">Team Standard</div><input class="cin" type="number" id="sS" value="15" min="0" oninput="uSC()"><span style="font-size:12px;color:var(--text-muted)">× $20/seat (annual)</span></div>
+        <div class="cr"><div class="clb">Team Premium</div><input class="cin" type="number" id="sP" value="5" min="0" oninput="uSC()"><span style="font-size:12px;color:var(--text-muted)">× $100/seat (annual)</span></div>
+        <div class="cr"><div class="clb">Pro (individual)</div><input class="cin" type="number" id="sPr" value="0" min="0" oninput="uSC()"><span style="font-size:12px;color:var(--text-muted)">× $17/user (annual)</span></div>
+        <div class="cres"><p style="margin:0 0 2px;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted)">Monthly Seat Cost (annual pricing)</p><div class="big" id="sT">$800</div><p id="sBk">—</p></div>
+      </div>
+    </div>
+
+    <!-- ═══ MATURITY ═══ -->
+    <div class="sec" id="maturity">
+      <div class="sh"><div class="ey">Optimize</div><h2>FinOps Maturity Model <span class="badge opinionated">Opinionated</span></h2><p class="ld">Stages of AI cost management capability.</p></div>
+      <div class="card">
+        <div style="display:flex;gap:2px;margin-bottom:24px;height:7px;border-radius:4px;overflow:hidden"><div style="flex:1;background:var(--accent-red)"></div><div style="flex:1;background:var(--accent-amber)"></div><div style="flex:1;background:var(--accent-green)"></div><div style="flex:1;background:var(--accent-blue)"></div></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div style="background:var(--accent-red-dim);border-radius:var(--radius);padding:18px"><h4 style="color:var(--accent-red);font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Stage 1 · Awareness</h4><h4>You know you're spending</h4><p style="font-size:12px;margin:0">Can see total spend but can't attribute to teams/products.</p></div>
+          <div style="background:var(--accent-amber-dim);border-radius:var(--radius);padding:18px"><h4 style="color:var(--accent-amber);font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Stage 2 · Visibility</h4><h4>Every dollar attributed</h4><p style="font-size:12px;margin:0">Keys mapped, workspaces aligned, monthly reviews, limits set. Target: 2-4 weeks.</p></div>
+          <div style="background:var(--accent-green-dim);border-radius:var(--radius);padding:18px"><h4 style="color:var(--accent-green);font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Stage 3 · Optimization</h4><h4>Actively reducing waste</h4><p style="font-size:12px;margin:0">Caching, routing, batch, seat right-sizing. Target: 2-3 months.</p></div>
+          <div style="background:var(--accent-blue-dim);border-radius:var(--radius);padding:18px"><h4 style="color:var(--accent-blue);font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Stage 4 · Governance</h4><h4>Self-managing through process</h4><p style="font-size:12px;margin:0">Automated alerts, budget owners, routine reviews, playbook. Target: 4-6 months.</p></div>
+        </div>
+      </div>
+      <h3>Getting Started</h3>
+      <ul class="cl">
+        <li><div class="cb" onclick="this.classList.toggle('ck')"></div><strong>Day 1:</strong> Set spend limits (not Unlimited)</li>
+        <li><div class="cb" onclick="this.classList.toggle('ck')"></div><strong>Week 1:</strong> Audit keys, disable unused, rename vague</li>
+        <li><div class="cb" onclick="this.classList.toggle('ck')"></div><strong>Week 1:</strong> Export Usage CSVs as baseline</li>
+        <li><div class="cb" onclick="this.classList.toggle('ck')"></div><strong>Week 2:</strong> Investigate spiky days, create named workspaces</li>
+        <li><div class="cb" onclick="this.classList.toggle('ck')"></div><strong>Week 3:</strong> Review seat utilization, evaluate caching</li>
+        <li><div class="cb" onclick="this.classList.toggle('ck')"></div><strong>Month 2:</strong> Document routing policy, set up alerts</li>
+        <li><div class="cb" onclick="this.classList.toggle('ck')"></div><strong>Month 3:</strong> Write the FinOps playbook</li>
+      </ul>
+    </div>
+
+    <!-- ═══ GLOSSARY ═══ -->
+    <div class="sec" id="glossary">
+      <div class="sh"><div class="ey">Learn · Reference</div><h2>Glossary</h2></div>
+      <div class="gg">
+        <div class="gi"><dt>MTok</dt><dd>Million tokens. Standard API billing unit. 1 MTok ≈ 750K words.</dd></div>
+        <div class="gi"><dt>Input Tokens</dt><dd>Everything sent: prompt, documents, history, tool defs.</dd></div>
+        <div class="gi"><dt>Output Tokens</dt><dd>Everything generated: response, thinking, tool calls. 3-5x input price.</dd></div>
+        <div class="gi"><dt>Context Window</dt><dd>Max tokens per request. 200K (Team), 500K (Enterprise), 1M (Opus 4.6).</dd></div>
+        <div class="gi"><dt>ITPM / OTPM</dt><dd>Input/Output Tokens Per Minute. Rate limit metrics in Console.</dd></div>
+        <div class="gi"><dt>TTL</dt><dd>Time To Live. Cache expiry. Default 5 min.</dd></div>
+        <div class="gi"><dt>Prompt Caching</dt><dd>Stores repeated content. Reads cost ~10% of standard input.</dd></div>
+        <div class="gi"><dt>Batch API</dt><dd>50% cheaper. Results within 24h. Non-urgent workloads.</dd></div>
+        <div class="gi"><dt>Workspace</dt><dd>API key container in Console. Group/filter for cost attribution.</dd></div>
+        <div class="gi"><dt>Admin API Key</dt><dd>sk-ant-admin... format. Org-level usage/cost data. Admin-only.</dd></div>
+        <div class="gi"><dt>Spend Limit</dt><dd>Per-user dollar cap beyond subscription. In Console Settings.</dd></div>
+        <div class="gi"><dt>Fast Mode</dt><dd>Opus only. 6x rates ($30/$150). Lower latency.</dd></div>
+        <div class="gi"><dt>max_tokens</dt><dd>API param capping response length. Essential for output cost control.</dd></div>
+        <div class="gi"><dt>Model Routing</dt><dd>Directing tasks to cheapest adequate model. Haiku→Sonnet→Opus.</dd></div>
+        <div class="gi"><dt>Cache Hit Rate</dt><dd>% of input tokens read from cache. Higher = cheaper.</dd></div>
+        <div class="gi"><dt>Extra Usage</dt><dd>Pay-per-token charges when subscription limits are exceeded.</dd></div>
+      </div>
+      <div class="sep"></div>
+      <p style="font-size:11px;color:var(--text-muted);text-align:center">Pricing data verified against <strong style="color:var(--text-dim)">claude.com/pricing</strong> and <strong style="color:var(--text-dim)">platform.claude.com/docs</strong> on April 10, 2026. Anthropic may change pricing at any time. Always verify before making purchasing decisions.</p>
+    </div>
+  </main>
+</div>
+
+<script>
+// Nav
+function nav(id){
+  document.querySelectorAll('.nav-item,.mnav button').forEach(n=>n.classList.remove('active'));
+  document.querySelector(`.nav-item[data-section="${id}"]`)?.classList.add('active');
+  document.querySelector(`.mnav button[data-section="${id}"]`)?.classList.add('active');
+  document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id)?.classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
+  document.querySelectorAll('.fb').forEach(b=>{b.classList.remove('a');void b.offsetWidth;setTimeout(()=>b.classList.add('a'),80)});
+}
+document.querySelectorAll('.nav-item').forEach(i=>i.addEventListener('click',()=>nav(i.dataset.section)));
+document.querySelectorAll('.mnav button').forEach(b=>b.addEventListener('click',()=>nav(b.dataset.section)));
+
+// Mode tabs
+document.querySelectorAll('.mode-tab').forEach(t=>{
+  t.addEventListener('click',()=>{
+    document.querySelectorAll('.mode-tab').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    const m=t.dataset.mode;
+    document.querySelectorAll('.nav-sec').forEach(s=>{s.style.display=s.classList.contains('mode-'+m)?'':'none'});
+    // Navigate to first item in mode
+    const first=document.querySelector('.nav-sec.mode-'+m+' .nav-item');
+    if(first)nav(first.dataset.section);
+  });
+});
+
+// Init bars
+setTimeout(()=>document.querySelectorAll('.fb').forEach(b=>b.classList.add('a')),300);
+
+// Plan Selector
+const ps={};
+function psA(q,v){ps[q]=v;const el=document.getElementById('psQ'+q);el.querySelectorAll('button').forEach(b=>b.classList.remove('sel'));event.target.classList.add('sel');el.classList.add('done');const nx=document.getElementById('psQ'+(q+1));if(nx){nx.style.display='block';nx.scrollIntoView({behavior:'smooth',block:'center'})}if(q===5)psShow()}
+function psShow(){
+  let plan='',price='',detail='';
+  if(ps[3]==='full'||ps[1]==='50+'){plan='Enterprise (sales-assisted)';price='Custom (contact sales)';detail='Full compliance requirements (HIPAA, audit logs, SCIM) or large organizations should engage Anthropic sales for tailored terms. Includes 500K context, usage commitments, and invoicing options.';}
+  else if(ps[3]==='sso'&&(ps[1]==='20-50'||ps[1]==='50+')){plan='Enterprise (self-serve)';price='$20/seat/mo + API usage (annual, min 20 seats)';detail='Self-serve Enterprise gives you SSO, audit logs, SCIM, and 500K context at $20/seat, the same per-seat as Team Standard annual. You get governance features without a sales cycle.';}
+  else if(ps[1]==='1-4'){
+    if(ps[2]==='no'&&ps[4]==='no'){plan='Pro';price='$20/user/mo ($17 annual)';detail='Individual Pro accounts. Full model access, Claude Code included. No admin console needed at this size.';}
+    else if(ps[5]==='often'){plan='Max 5x or 20x';price='$100-200/user/mo';detail='Frequent limit-hitting at this team size suggests Max. 5x ($100) for most; 20x ($200) for all-day power users.';}
+    else{plan='Pro + Console API keys';price='$20/user + API usage';detail='Pro seats for chat, separate Console API keys for product integration. Team plans require 5 seats minimum.';}
+  }
+  else if(ps[2]==='most'||ps[5]==='often'){plan='Team: mix Standard + Premium';price='Std $20/seat + Prem $100/seat (annual)';detail='Premium seats for power users needing 6.25x Pro usage (vs 1.25x on Standard). Both tiers include Claude Code. Use Premium for heavy users, Standard for everyone else. Mix and match within the same plan.';}
+  else{plan='Team Standard';price='$20/seat/mo (annual) or $25 monthly';detail='Default for 5-20 person teams. Admin console, shared projects, Claude Code included, 1.25x Pro usage. If some team members need heavier usage (6.25x Pro), upgrade those individuals to Premium.';
+    if(ps[2]==='some')detail+=' All seats include Claude Code. Premium is only needed for the higher usage allowance, not for Code access.';}
+  document.getElementById('psR').innerHTML=`<div class="pr"><h3>Recommended</h3><div class="rp">${plan}</div><div style="font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--accent-amber);margin-bottom:14px">${price}</div><p class="rd">${detail}</p></div>`;
+  document.getElementById('psR').style.display='block';document.getElementById('psRst').style.display='inline-block';
+  document.getElementById('psR').scrollIntoView({behavior:'smooth',block:'center'});
+}
+function psReset(){for(let i=1;i<=5;i++){const q=document.getElementById('psQ'+i);q.classList.remove('done');if(i>1)q.style.display='none';q.querySelectorAll('button').forEach(b=>b.classList.remove('sel'))}document.getElementById('psR').style.display='none';document.getElementById('psRst').style.display='none';Object.keys(ps).forEach(k=>delete ps[k])}
+
+// Calculator
+function cC(iM,oM,h,s,o,bp,cp){
+  const ms=[{i:1,o:5,p:h},{i:3,o:15,p:s},{i:5,o:25,p:o}];let ti=0,to=0;
+  ms.forEach(m=>{const mi=iM*(m.p/100),mo=oM*(m.p/100),ca=mi*(cp/100),uc=mi*(1-cp/100);ti+=(ca*m.i*.1)+(uc*(1-bp/100)*m.i)+(uc*(bp/100)*m.i*.5);to+=(mo*(1-bp/100)*m.o)+(mo*(bp/100)*m.o*.5)});
+  return{i:ti,o:to,t:ti+to}
+}
+function fm(n){return'$'+Math.round(n).toLocaleString('en-US')}
+function uMM(){
+  const iM=+document.getElementById('mmI').value||0,oM=+document.getElementById('mmO').value||0;
+  const h=+document.getElementById('mmH').value||0,s=+document.getElementById('mmS').value||0,o=+document.getElementById('mmP').value||0;
+  document.getElementById('mmW').style.display=(h+s+o!==100)?'block':'none';
+  const b=cC(iM,oM,h,s,o,+document.getElementById('mmBB').value||0,+document.getElementById('mmCB').value||0);
+  const a=cC(iM,oM,h,s,o,+document.getElementById('mmBA').value||0,+document.getElementById('mmCA').value||0);
+  document.getElementById('mmBf').textContent=fm(b.t);document.getElementById('mmBd').textContent=`In: ${fm(b.i)} · Out: ${fm(b.o)}`;
+  document.getElementById('mmAf').textContent=fm(a.t);document.getElementById('mmAd').textContent=`In: ${fm(a.i)} · Out: ${fm(a.o)}`;
+  const sv=b.t-a.t,pc=b.t>0?Math.round(sv/b.t*100):0;
+  document.getElementById('mmSv').textContent=`${fm(sv)} (${pc}% reduction)`;
+}
+uMM();
+function uSC(){
+  const s=+(document.getElementById('sS').value)||0,p=+(document.getElementById('sP').value)||0,pr=+(document.getElementById('sPr').value)||0;
+  const t=s*20+p*100+pr*17;
+  document.getElementById('sT').textContent='$'+t.toLocaleString('en-US');
+  document.getElementById('sBk').textContent=`${s} Std ($${(s*20).toLocaleString()}) + ${p} Prem ($${(p*100).toLocaleString()}) + ${pr} Pro ($${(pr*17).toLocaleString()})`;
+}
+uSC();
+</script>
+</body>
+</html>
